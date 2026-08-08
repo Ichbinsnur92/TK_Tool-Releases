@@ -16,7 +16,7 @@ Die aktuelle Version befindet sich unter [Releases](https://github.com/Ichbinsnu
 Nach dem Download kann die SHA-256-Prüfsumme in PowerShell verglichen werden:
 
 ```powershell
-Get-FileHash .\SIP-Fehleranalyse-v1.4.12-Setup.exe -Algorithm SHA256
+Get-FileHash .\SIP-Fehleranalyse-v1.5.1-Setup.exe -Algorithm SHA256
 ```
 
 Der ausgegebene Hash muss mit dem entsprechenden Eintrag in `SHA256SUMS.txt` übereinstimmen.
