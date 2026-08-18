@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - automation/publish-v1.6.1
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -17,8 +20,8 @@ jobs:
 
       - name: Download verified private build artifacts
         env:
-          INSTALLER_ARTIFACT_URL: 'https://sdmntprukwest.oaiusercontent.com/files/00000000-08bc-8243-93a5-14fd03a9dd0a/raw?se=2026-08-18T20%3A27%3A19Z&sp=r&sv=2026-02-06&sr=b&scid=0ab119cc-3743-5c8c-a2ec-f2f358e4a7d8&skoid=5bfb38a5-43fb-4c63-80a1-6ae1e97e2e16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-17T22%3A45%3A05Z&ske=2026-08-18T22%3A45%3A05Z&sks=b&skv=2026-02-06&sig=l51fFLN8IEDO/IhAl6l7I4izSPEuZfieag%2BgN7EyI/w%3D'
-          PORTABLE_ARTIFACT_URL: 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-680c-81f4-a344-d4d658379ea2/raw?se=2026-08-18T20%3A27%3A38Z&sp=r&sv=2026-02-06&sr=b&scid=024195d7-33c1-5e43-969e-0df01b9e07d7&skoid=5bfb38a5-43fb-4c63-80a1-6ae1e97e2e16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-18T09%3A23%3A58Z&ske=2026-08-19T09%3A23%3A58Z&sks=b&skv=2026-02-06&sig=xHdeImJwnf9k%2BrSpJrM/F8cCHEMGtqbEc%2BOEFcWjF0E%3D'
+          INSTALLER_ARTIFACT_URL: 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-86d0-81f4-821d-8d0df113ae51/raw?se=2026-08-18T20%3A30%3A25Z&sp=r&sv=2026-02-06&sr=b&scid=1c97223c-66ac-5a6e-8bf1-61e66c89907b&skoid=5bfb38a5-43fb-4c63-80a1-6ae1e97e2e16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-18T08%3A27%3A57Z&ske=2026-08-19T08%3A27%3A57Z&sks=b&skv=2026-02-06&sig=SQSu0q1biTSDVRPuJtJRzYaMpyU1yiIfIjqUJfddskc%3D'
+          PORTABLE_ARTIFACT_URL: 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-4be0-81f4-8a83-b82b32ac2c87/raw?se=2026-08-18T20%3A30%3A41Z&sp=r&sv=2026-02-06&sr=b&scid=3b4e8050-8420-5d5d-bb97-24696f1b8f7f&skoid=5bfb38a5-43fb-4c63-80a1-6ae1e97e2e16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-18T07%3A51%3A09Z&ske=2026-08-19T07%3A51%3A09Z&sks=b&skv=2026-02-06&sig=f%2BcLB4aEHjZMNPiZwOR8ry22yOmdhSKhhvoodb3lRb0%3D'
         run: |
           set -euo pipefail
           curl -L --fail --retry 3 "$INSTALLER_ARTIFACT_URL" -o installer-artifact.zip
@@ -27,16 +30,22 @@ jobs:
           unzip -p SIP-Fehleranalyse-v1.6.1-Portable.zip 'RELEASE-NOTES-v1.6.1.txt' > RELEASE-NOTES-v1.6.1.txt
           sha256sum SIP-Fehleranalyse-v1.6.1-Portable.zip SIP-Fehleranalyse-v1.6.1-Setup.exe > SHA256SUMS.txt
 
-      - name: Publish GitHub release
+      - name: Publish or verify GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create v1.6.1 \
-            SIP-Fehleranalyse-v1.6.1-Portable.zip \
-            SIP-Fehleranalyse-v1.6.1-Setup.exe \
-            RELEASE-NOTES-v1.6.1.txt \
-            SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --target main \
-            --title 'SIP-Fehleranalyse 1.6.1' \
-            --notes-file RELEASE-NOTES-v1.6.1.txt
+          set -euo pipefail
+          if gh release view v1.6.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release v1.6.1 already exists; verifying it.'
+          else
+            gh release create v1.6.1 \
+              SIP-Fehleranalyse-v1.6.1-Portable.zip \
+              SIP-Fehleranalyse-v1.6.1-Setup.exe \
+              RELEASE-NOTES-v1.6.1.txt \
+              SHA256SUMS.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --target main \
+              --title 'SIP-Fehleranalyse 1.6.1' \
+              --notes-file RELEASE-NOTES-v1.6.1.txt
+          fi
+          gh release view v1.6.1 --repo "$GITHUB_REPOSITORY" --json name,tagName,isDraft,isPrerelease,assets,url
