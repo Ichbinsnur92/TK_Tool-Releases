@@ -23,7 +23,7 @@ Der Wechsel von 1.6.1 auf 1.6.2 muss einmalig über den normalen Installer bezie
 Nach dem Download kann die SHA-256-Prüfsumme in PowerShell verglichen werden:
 
 ```powershell
-Get-FileHash .\SIP-Fehleranalyse-v1.6.2-Setup.exe -Algorithm SHA256
+Get-FileHash .\SIP-Fehleranalyse-v1.6.3-Setup.exe -Algorithm SHA256
 ```
 
 Der ausgegebene Hash muss mit dem entsprechenden Eintrag in `SHA256SUMS.txt` übereinstimmen.
