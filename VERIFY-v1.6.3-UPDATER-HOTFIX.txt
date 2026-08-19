@@ -1,0 +1,7 @@
+status=OK
+tag=v1.6.3
+updater_hotfix=file-stream-closed-before-final-move
+update_manifest_sha256=fa2ab6586f32e377538a4790a18b92ef7ffa546613f0b521ce92d27810e3b76f
+installer_sha256=7521a81aff035fbfb63d2dc82ebcfd30d6249e8c65bb44a03c398eea19c709d2
+portable_sha256=3ed76004b1db7132d321e7c65e1da867ff2e763bdbb572dc1bd760a1d424f692
+assets=6
