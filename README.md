@@ -10,22 +10,25 @@ Die aktuelle Version befindet sich unter [Releases](https://github.com/Ichbinsnu
 - der Windows-Installer
 - die Release Notes
 - `SHA256SUMS.txt` zur Prüfung der heruntergeladenen Dateien
+- `update-manifest.json` und `update-manifest.sig` für kryptografisch abgesicherte In-App-Updates
 
-## Update-Prüfung
+## Sichere One-Click-Updates
 
-Die SIP-Fehleranalyse prüft auf Wunsch beziehungsweise regelmäßig, ob in diesem öffentlichen Repository eine neuere Version veröffentlicht wurde. Wird eine neuere Version gefunden, kann die offizielle GitHub-Release-Seite direkt aus der Anwendung geöffnet und das neue Paket von dort installiert werden.
+Ab SIP-Fehleranalyse 1.6.2 kann eine neuere Version direkt innerhalb der Anwendung heruntergeladen und installiert werden. Vor der Installation prüft die Anwendung das separat ECDSA-signierte Update-Manifest sowie Dateigröße und SHA-256 des ausgewählten Pakets. Ohne gültiges `update-manifest.json` und `update-manifest.sig` wird kein automatisches Update ausgeführt.
+
+Version 1.6.5 stellt diese sichere Updatekette nach dem fehlerhaften 1.6.4-Release wieder vollständig her. Installationen von 1.6.3 können daher direkt auf 1.6.5 aktualisieren.
 
 ## Integrität prüfen
 
 Nach dem Download kann die SHA-256-Prüfsumme in PowerShell verglichen werden:
 
 ```powershell
-Get-FileHash .\SIP-Fehleranalyse-v1.6.4-Setup.exe -Algorithm SHA256
+Get-FileHash .\SIP-Fehleranalyse-v1.6.5-Setup.exe -Algorithm SHA256
 ```
 
 Der ausgegebene Hash muss mit dem entsprechenden Eintrag in `SHA256SUMS.txt` übereinstimmen.
 
-Die veröffentlichte Anwendung enthält zusätzlich ein signiertes Integritätsmanifest und prüft ihre eigene Programmdatei beim Start.
+Die veröffentlichte Anwendung enthält zusätzlich ein signiertes Integritätsmanifest und prüft ihre eigene Programmdatei sowie den Update-Helfer beim Start.
 
 ## Windows-Sicherheitshinweis
 
