@@ -1,0 +1,65 @@
+name: Publish SIP-Fehleranalyse v1.6.5
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-v1.6.5.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Download validated v1.6.5 release assets
+        shell: bash
+        env:
+          RELEASE_ASSETS_URL: "https://sdmntprnortheu.oaiusercontent.com/files/00000000-f634-81f4-aea9-919bdfa2aa7d/raw?se=2026-08-19T22%3A49%3A50Z&sp=r&sv=2026-02-06&sr=b&scid=99594f46-0c6e-5edc-a03e-8bf7216c7583&skoid=34268b52-5349-4f34-9be4-e38a5fb9f231&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-19T05%3A37%3A16Z&ske=2026-08-20T05%3A37%3A16Z&sks=b&skv=2026-02-06&sig=gtAN/vTA%2BOdjkQDKHwRAajlvDnw4jn4KzUfeQGWSWjM%3D"
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          curl -fL --retry 3 --retry-delay 2 "$RELEASE_ASSETS_URL" -o release-assets.zip
+          unzip -q release-assets.zip -d release
+          test -s release/SIP-Fehleranalyse-v1.6.5-Setup.exe
+          test -s release/SIP-Fehleranalyse-v1.6.5-Portable.zip
+          test -s release/RELEASE-NOTES-v1.6.5.txt
+          test -s release/update-manifest.json
+          test -s release/update-manifest.sig
+          test -s release/SHA256SUMS.txt
+          (cd release && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('release/update-manifest.json').read_text(encoding='utf-8-sig'))
+          assert data['schemaVersion'] == 1
+          assert data['product'] == 'SIP-Fehleranalyse'
+          assert data['appVersion'] == '1.6.5'
+          assert data['installer']['fileName'] == 'SIP-Fehleranalyse-v1.6.5-Setup.exe'
+          assert data['portable']['fileName'] == 'SIP-Fehleranalyse-v1.6.5-Portable.zip'
+          PY
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.6.5 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v1.6.5 already exists; refusing to overwrite it."
+            exit 1
+          fi
+          gh release create v1.6.5 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target main \
+            --title "SIP-Fehleranalyse v1.6.5" \
+            --notes-file release/RELEASE-NOTES-v1.6.5.txt \
+            release/SIP-Fehleranalyse-v1.6.5-Setup.exe \
+            release/SIP-Fehleranalyse-v1.6.5-Portable.zip \
+            release/RELEASE-NOTES-v1.6.5.txt \
+            release/update-manifest.json \
+            release/update-manifest.sig \
+            release/SHA256SUMS.txt
