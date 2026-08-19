@@ -1,0 +1,4 @@
+v1.6.5 public release verified successfully.
+Release: https://github.com/Ichbinsnur92/TK_Tool-Releases/releases/tag/v1.6.5
+Required assets including signed update-manifest.json/update-manifest.sig: OK
+Verified by GitHub Actions run 32310365750
