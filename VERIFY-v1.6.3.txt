@@ -1,0 +1,8 @@
+status=OK
+tag=v1.6.3
+draft=false
+prerelease=false
+assets=6
+installer=SIP-Fehleranalyse-v1.6.3-Setup.exe
+portable=SIP-Fehleranalyse-v1.6.3-Portable.zip
+update_manifest=1.6.3
