@@ -1,0 +1,98 @@
+name: SIP-Fehleranalyse 1.6.3 veröffentlichen
+
+on:
+  push:
+    branches:
+      - 'publish/1.6.3'
+    paths:
+      - '.github/workflows/publish-1.6.3.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_BUNDLE_URL: 'https://sdmntpritalynorth.oaiusercontent.com/files/00000000-13f8-8246-923e-9f28b9a188db/raw?se=2026-08-19T05%3A11%3A55Z&sp=r&sv=2026-02-06&sr=b&scid=1eca289a-dfe3-5b50-8782-de0b428d9438&skoid=a0b9f82a-c86e-4064-a822-2aa38890bb37&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-19T04%3A49%3A58Z&ske=2026-08-20T04%3A49%3A58Z&sks=b&skv=2026-02-06&sig=e3jL3Ph%2BF9grEKXjTHWtFM64YkShUJT9UyrAC31iskA%3D'
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Release-Artefakt laden
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 "$RELEASE_BUNDLE_URL" --output release-assets.zip
+          echo '17dc6cab740d6ce15b044410fe18abbaec888ba030a582fae46d32a1772dbf42  release-assets.zip' | sha256sum --check --strict
+
+      - name: Release-Dateien prüfen
+        run: |
+          set -euo pipefail
+          mkdir assets
+          unzip -q release-assets.zip -d assets
+          expected=$(cat <<'EOF'
+          RELEASE-NOTES-v1.6.3.txt
+          SHA256SUMS.txt
+          SIP-Fehleranalyse-v1.6.3-Portable.zip
+          SIP-Fehleranalyse-v1.6.3-Setup.exe
+          update-manifest.json
+          update-manifest.sig
+          EOF
+          )
+          actual=$(find assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          test "$actual" = "$(printf '%s\n' "$expected" | sort)"
+          grep -F '"appVersion":"1.6.3"' assets/update-manifest.json
+          grep -F '"fileName":"SIP-Fehleranalyse-v1.6.3-Setup.exe"' assets/update-manifest.json
+          grep -F '"fileName":"SIP-Fehleranalyse-v1.6.3-Portable.zip"' assets/update-manifest.json
+          (cd assets && sha256sum --check SHA256SUMS.txt)
+
+      - name: Öffentliches Release v1.6.3 erstellen
+        run: |
+          set -euo pipefail
+          if gh release view v1.6.3 --repo Ichbinsnur92/TK_Tool-Releases >/dev/null 2>&1; then
+            echo 'Release v1.6.3 existiert bereits; Abbruch statt Überschreiben.' >&2
+            exit 1
+          fi
+          gh release create v1.6.3 \
+            assets/SIP-Fehleranalyse-v1.6.3-Setup.exe \
+            assets/SIP-Fehleranalyse-v1.6.3-Portable.zip \
+            assets/RELEASE-NOTES-v1.6.3.txt \
+            assets/SHA256SUMS.txt \
+            assets/update-manifest.json \
+            assets/update-manifest.sig \
+            --repo Ichbinsnur92/TK_Tool-Releases \
+            --title 'SIP-Fehleranalyse 1.6.3' \
+            --notes-file assets/RELEASE-NOTES-v1.6.3.txt
+
+      - name: Öffentliches Release verifizieren
+        run: |
+          set -euo pipefail
+          meta=$(gh release view v1.6.3 --repo Ichbinsnur92/TK_Tool-Releases --json tagName,isDraft,isPrerelease,assets)
+          test "$(printf '%s' "$meta" | jq -r '.tagName')" = 'v1.6.3'
+          test "$(printf '%s' "$meta" | jq -r '.isDraft')" = 'false'
+          test "$(printf '%s' "$meta" | jq -r '.isPrerelease')" = 'false'
+          test "$(printf '%s' "$meta" | jq '.assets | length')" = '6'
+          printf '%s' "$meta" | jq -e '.assets[].name | select(. == "SIP-Fehleranalyse-v1.6.3-Setup.exe")' >/dev/null
+          printf '%s' "$meta" | jq -e '.assets[].name | select(. == "SIP-Fehleranalyse-v1.6.3-Portable.zip")' >/dev/null
+          rm -rf public-check
+          mkdir public-check
+          gh release download v1.6.3 --repo Ichbinsnur92/TK_Tool-Releases --pattern update-manifest.json --dir public-check
+          grep -F '"appVersion":"1.6.3"' public-check/update-manifest.json
+          cat > VERIFY-v1.6.3.txt <<'EOF'
+          status=OK
+          tag=v1.6.3
+          draft=false
+          prerelease=false
+          assets=6
+          installer=SIP-Fehleranalyse-v1.6.3-Setup.exe
+          portable=SIP-Fehleranalyse-v1.6.3-Portable.zip
+          update_manifest=1.6.3
+          EOF
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add VERIFY-v1.6.3.txt
+          git commit -m 'Verify SIP-Fehleranalyse 1.6.3 release'
+          git push origin HEAD:publish/1.6.3
