@@ -1,0 +1,63 @@
+name: Verify public 1.6.2 updater hotfix
+
+on:
+  push:
+    branches:
+      - 'republish/1.6.2-updater-hotfix'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Auf korrigiertes öffentliches Manifest warten
+        run: |
+          set -euo pipefail
+          expected='b1d0e0b5e113b23445b4bf2a520c557a71dd0222defaf5e53822761024cc5e9a'
+          ok=0
+          for i in $(seq 1 60); do
+            if curl --fail --silent --show-error --location \
+              'https://github.com/Ichbinsnur92/TK_Tool-Releases/releases/download/v1.6.2/update-manifest.json' \
+              --output public-update-manifest.json; then
+              actual=$(sha256sum public-update-manifest.json | awk '{print $1}')
+              if [ "$actual" = "$expected" ]; then
+                ok=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+          test "$ok" -eq 1
+          grep -F '"appVersion":"1.6.2"' public-update-manifest.json
+
+      - name: Öffentliche Release-Struktur prüfen
+        run: |
+          set -euo pipefail
+          test "$(gh release view v1.6.2 --repo Ichbinsnur92/TK_Tool-Releases --json assets --jq '.assets | length')" -eq 6
+          gh release view v1.6.2 --repo Ichbinsnur92/TK_Tool-Releases --json assets --jq '.assets[].name' | grep -Fx 'SIP-Fehleranalyse-v1.6.2-Setup.exe'
+          gh release view v1.6.2 --repo Ichbinsnur92/TK_Tool-Releases --json assets --jq '.assets[].name' | grep -Fx 'SIP-Fehleranalyse-v1.6.2-Portable.zip'
+
+      - name: Verifikationsmarker auf main schreiben
+        run: |
+          set -euo pipefail
+          body=$(cat <<'EOF'
+          status=OK
+          tag=v1.6.2
+          updater_hotfix=file-stream-closed-before-final-move
+          update_manifest_sha256=b1d0e0b5e113b23445b4bf2a520c557a71dd0222defaf5e53822761024cc5e9a
+          installer_sha256=ed06a25ad93fa4f3f1cf948847541d9da96b91259c1a0bc474cfa221a4eb333c
+          portable_sha256=d832554294551c95a7a57fcc6756ccb4591d5d03414d33d99989d1f8825edbd2
+          assets=6
+          EOF
+          )
+          encoded=$(printf '%s\n' "$body" | base64 -w0)
+          gh api --method PUT \
+            repos/Ichbinsnur92/TK_Tool-Releases/contents/VERIFY-v1.6.2-UPDATER-HOTFIX.txt \
+            -f message='Verify v1.6.2 updater hotfix' \
+            -f content="$encoded" \
+            -f branch='main'
