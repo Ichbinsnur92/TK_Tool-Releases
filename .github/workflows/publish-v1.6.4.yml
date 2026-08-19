@@ -1,0 +1,72 @@
+name: Publish SIP-Fehleranalyse v1.6.4
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-v1.6.4.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download validated release artifacts
+        shell: bash
+        env:
+          INSTALLER_URL: "https://sdmntpritalynorth.oaiusercontent.com/files/00000000-b658-8246-acea-11315dd02760/raw?se=2026-08-19T22%3A12%3A41Z&sp=r&sv=2026-02-06&sr=b&scid=c5782ae8-711f-5cc7-9fb7-88ae3b693d92&skoid=e5f84a89-964a-4fd3-92c2-c2cb3a12ea16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-18T23%3A18%3A25Z&ske=2026-08-19T23%3A18%3A25Z&sks=b&skv=2026-02-06&sig=AZyLep7Bg86t/fWZXli2ktLfPUVa7LedB1e6V4CEX3Q%3D"
+          PORTABLE_URL: "https://sdmntprpolandcentral.oaiusercontent.com/files/00000000-dd48-820a-899e-4900f225f5a9/raw?se=2026-08-19T22%3A13%3A01Z&sp=r&sv=2026-02-06&sr=b&scid=c119dc6a-9b3e-5b9f-b6f0-7f76ee3a995a&skoid=e5f84a89-964a-4fd3-92c2-c2cb3a12ea16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-19T00%3A10%3A38Z&ske=2026-08-20T00%3A10%3A38Z&sks=b&skv=2026-02-06&sig=mvrm4R03fAw5hqLVH0FC9TzI/afhLN2XbFg/Q/WjTXU%3D"
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          curl -fL --retry 3 --retry-delay 2 "$INSTALLER_URL" -o installer-artifact.zip
+          curl -fL --retry 3 --retry-delay 2 "$PORTABLE_URL" -o release/SIP-Fehleranalyse-v1.6.4-Portable.zip
+          unzip -q installer-artifact.zip -d release
+          test -s release/SIP-Fehleranalyse-v1.6.4-Setup.exe
+          test -s release/SIP-Fehleranalyse-v1.6.4-Portable.zip
+
+      - name: Create release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release/RELEASE-NOTES-v1.6.4.txt <<'EOF'
+          SIP-Fehleranalyse v1.6.4
+          ========================
+
+          Lizenzierung und virtuelle Maschinen
+          ------------------------------------
+          - TPM/vTPM bleibt die bevorzugte Gerätebindung.
+          - Windows-VMs ohne nutzbares TPM/vTPM verwenden automatisch einen persistenten ECDSA-P-256-Software-Geräteschlüssel.
+          - Der private Software-Geräteschlüssel wird mit Windows DPAPI benutzergebunden verschlüsselt gespeichert und niemals im Klartext oder an den Lizenzserver übertragen.
+          - Challenge/Response, Geräte-Key-ID und serverseitig signierte Online-Leases bleiben kryptografisch abgesichert.
+
+          Versionsüberwachung
+          -------------------
+          - Aktivierung, Lizenzanfrage, Lizenzabholung und Lease-Erneuerung melden die Anwendungsversion an den Lizenzserver.
+          - Im Lizenzserver ist damit sichtbar, welche Installation bereits v1.6.4 verwendet und wann die Version erstmals erfolgreich Kontakt hatte.
+          EOF
+          (cd release && sha256sum SIP-Fehleranalyse-v1.6.4-Setup.exe SIP-Fehleranalyse-v1.6.4-Portable.zip > SHA256SUMS.txt)
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.6.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v1.6.4 exists already; refusing to overwrite it."
+            exit 1
+          fi
+          gh release create v1.6.4 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target main \
+            --title "SIP-Fehleranalyse v1.6.4" \
+            --notes-file release/RELEASE-NOTES-v1.6.4.txt \
+            release/SIP-Fehleranalyse-v1.6.4-Setup.exe \
+            release/SIP-Fehleranalyse-v1.6.4-Portable.zip \
+            release/RELEASE-NOTES-v1.6.4.txt \
+            release/SHA256SUMS.txt
