@@ -1,0 +1,63 @@
+name: SIP-Fehleranalyse 1.6.2 veröffentlichen
+
+on:
+  push:
+    branches:
+      - 'publish/1.6.2'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_BUNDLE_URL: 'https://sdmntprukwest.oaiusercontent.com/files/00000000-b3d8-8243-b5e1-fa599988f287/raw?se=2026-08-19T04%3A54%3A03Z&sp=r&sv=2026-02-06&sr=b&scid=72709fe8-8944-5ced-9fd9-f903aa84a071&skoid=a0b9f82a-c86e-4064-a822-2aa38890bb37&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-19T00%3A19%3A31Z&ske=2026-08-20T00%3A19%3A31Z&sks=b&skv=2026-02-06&sig=%2B//sEkPhsQE7M72rWmx5jeZKAKD%2BHlJmdNRJcsxpAgc%3D'
+
+    steps:
+      - name: Release-Artefakt laden
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 "$RELEASE_BUNDLE_URL" --output release-assets.zip
+          echo 'da889e6f55aa20061dcab7e9c40ce3d52a93f3d01d29cca533f9d4db912cd609  release-assets.zip' | sha256sum --check --strict
+
+      - name: Release-Dateien prüfen
+        run: |
+          set -euo pipefail
+          mkdir assets
+          unzip -q release-assets.zip -d assets
+          expected=$(cat <<'EOF'
+          RELEASE-NOTES-v1.6.2.txt
+          SHA256SUMS.txt
+          SIP-Fehleranalyse-v1.6.2-Portable.zip
+          SIP-Fehleranalyse-v1.6.2-Setup.exe
+          update-manifest.json
+          update-manifest.sig
+          EOF
+          )
+          actual=$(find assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          test "$actual" = "$(printf '%s\n' "$expected" | sort)"
+          grep -F '"appVersion":"1.6.2"' assets/update-manifest.json
+          grep -F '"fileName":"SIP-Fehleranalyse-v1.6.2-Setup.exe"' assets/update-manifest.json
+          grep -F '"fileName":"SIP-Fehleranalyse-v1.6.2-Portable.zip"' assets/update-manifest.json
+          (cd assets && sha256sum --check SHA256SUMS.txt)
+
+      - name: Öffentliches Release v1.6.2 erstellen
+        run: |
+          set -euo pipefail
+          if gh release view v1.6.2 --repo Ichbinsnur92/TK_Tool-Releases >/dev/null 2>&1; then
+            echo 'Release v1.6.2 existiert bereits; Abbruch statt Überschreiben.' >&2
+            exit 1
+          fi
+          gh release create v1.6.2 \
+            assets/SIP-Fehleranalyse-v1.6.2-Setup.exe \
+            assets/SIP-Fehleranalyse-v1.6.2-Portable.zip \
+            assets/RELEASE-NOTES-v1.6.2.txt \
+            assets/SHA256SUMS.txt \
+            assets/update-manifest.json \
+            assets/update-manifest.sig \
+            --repo Ichbinsnur92/TK_Tool-Releases \
+            --title 'SIP-Fehleranalyse 1.6.2' \
+            --notes-file assets/RELEASE-NOTES-v1.6.2.txt
