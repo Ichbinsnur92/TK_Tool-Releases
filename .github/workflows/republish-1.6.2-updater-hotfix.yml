@@ -1,0 +1,70 @@
+name: SIP-Fehleranalyse 1.6.2 Updater-Hotfix erneut veröffentlichen
+
+on:
+  push:
+    branches:
+      - 'republish/1.6.2-updater-hotfix'
+
+permissions:
+  contents: write
+
+jobs:
+  republish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_BUNDLE_URL: 'https://sdmntpritalynorth.oaiusercontent.com/files/00000000-3dd0-8246-96b9-34af8dc115ba/raw?se=2026-08-19T05%3A30%3A26Z&sp=r&sv=2026-02-06&sr=b&scid=6d5abd3b-564a-5bd5-9eb3-b5d15964529c&skoid=a0b9f82a-c86e-4064-a822-2aa38890bb37&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-19T00%3A15%3A33Z&ske=2026-08-20T00%3A15%3A33Z&sks=b&skv=2026-02-06&sig=8w9SdDKc3x3Q6INQMa4bua6cZxcbWTb8W1bqBq%2Bh4dw%3D'
+
+    steps:
+      - name: Korrigiertes Release-Artefakt laden
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 "$RELEASE_BUNDLE_URL" --output release-assets.zip
+          echo 'ece927183852e8ccbd4eaf61a049a1816d64a5144dfedd190551a86cae84c7cf  release-assets.zip' | sha256sum --check --strict
+
+      - name: Release-Dateien prüfen
+        run: |
+          set -euo pipefail
+          mkdir assets
+          unzip -q release-assets.zip -d assets
+          test "$(find assets -maxdepth 1 -type f | wc -l)" -eq 6
+          test -f assets/SIP-Fehleranalyse-v1.6.2-Setup.exe
+          test -f assets/SIP-Fehleranalyse-v1.6.2-Portable.zip
+          test -f assets/RELEASE-NOTES-v1.6.2.txt
+          test -f assets/SHA256SUMS.txt
+          test -f assets/update-manifest.json
+          test -f assets/update-manifest.sig
+          grep -F '"appVersion":"1.6.2"' assets/update-manifest.json
+          grep -F '"fileName":"SIP-Fehleranalyse-v1.6.2-Setup.exe"' assets/update-manifest.json
+          grep -F '"fileName":"SIP-Fehleranalyse-v1.6.2-Portable.zip"' assets/update-manifest.json
+          (cd assets && sha256sum --check SHA256SUMS.txt)
+
+      - name: Bestehendes Release v1.6.2 ersetzen
+        run: |
+          set -euo pipefail
+          gh release view v1.6.2 --repo Ichbinsnur92/TK_Tool-Releases >/dev/null
+          gh release upload v1.6.2 \
+            assets/SIP-Fehleranalyse-v1.6.2-Setup.exe \
+            assets/SIP-Fehleranalyse-v1.6.2-Portable.zip \
+            assets/RELEASE-NOTES-v1.6.2.txt \
+            assets/SHA256SUMS.txt \
+            assets/update-manifest.json \
+            assets/update-manifest.sig \
+            --repo Ichbinsnur92/TK_Tool-Releases \
+            --clobber
+          gh release edit v1.6.2 \
+            --repo Ichbinsnur92/TK_Tool-Releases \
+            --title 'SIP-Fehleranalyse 1.6.2' \
+            --notes-file assets/RELEASE-NOTES-v1.6.2.txt
+
+      - name: Öffentliche Assets gegenprüfen
+        run: |
+          set -euo pipefail
+          count=$(gh release view v1.6.2 --repo Ichbinsnur92/TK_Tool-Releases --json assets --jq '.assets | length')
+          test "$count" -eq 6
+          curl --fail --location --retry 3 \
+            'https://github.com/Ichbinsnur92/TK_Tool-Releases/releases/download/v1.6.2/update-manifest.json' \
+            --output public-update-manifest.json
+          cmp assets/update-manifest.json public-update-manifest.json
+          echo 'v1.6.2 updater hotfix public verification: OK'
