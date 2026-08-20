@@ -1,0 +1,92 @@
+name: Publish SIP-Fehleranalyse v1.6.7
+
+on:
+  push:
+    branches:
+      - release/publish-v1.6.7-public
+    paths:
+      - .github/workflows/publish-v1.6.7.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Download validated v1.6.7 release assets
+        shell: bash
+        env:
+          RELEASE_ASSETS_URL: "https://sdmntprpolandcentral.oaiusercontent.com/files/00000000-f0ec-820a-83cf-3d0d24fdd2b1/raw?se=2026-08-20T18%3A54%3A11Z&sp=r&sv=2026-02-06&sr=b&scid=fbc37b81-eece-560c-b64a-6f739b03c56c&skoid=e5f84a89-964a-4fd3-92c2-c2cb3a12ea16&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-20T04%3A24%3A13Z&ske=2026-08-21T04%3A24%3A13Z&sks=b&skv=2026-02-06&sig=nBtuotBe%2BlIRdL3dup1Qvrw54QnraJHp1hzMPSaFiwY%3D"
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          curl -fL --retry 3 --retry-delay 2 "$RELEASE_ASSETS_URL" -o release-assets.zip
+          unzip -q release-assets.zip -d release
+          test -s release/SIP-Fehleranalyse-v1.6.7-Setup.exe
+          test -s release/SIP-Fehleranalyse-v1.6.7-Portable.zip
+          test -s release/RELEASE-NOTES-v1.6.7.txt
+          test -s release/update-manifest.json
+          test -s release/update-manifest.sig
+          test -s release/SHA256SUMS.txt
+          (cd release && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('release/update-manifest.json').read_text(encoding='utf-8-sig'))
+          assert data['schemaVersion'] == 1
+          assert data['product'] == 'SIP-Fehleranalyse'
+          assert data['appVersion'] == '1.6.7'
+          assert data['installer']['fileName'] == 'SIP-Fehleranalyse-v1.6.7-Setup.exe'
+          assert data['portable']['fileName'] == 'SIP-Fehleranalyse-v1.6.7-Portable.zip'
+          PY
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.6.7 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v1.6.7 already exists; refusing to overwrite it."
+            exit 1
+          fi
+          gh release create v1.6.7 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target main \
+            --title "SIP-Fehleranalyse v1.6.7" \
+            --notes-file release/RELEASE-NOTES-v1.6.7.txt \
+            release/SIP-Fehleranalyse-v1.6.7-Setup.exe \
+            release/SIP-Fehleranalyse-v1.6.7-Portable.zip \
+            release/RELEASE-NOTES-v1.6.7.txt \
+            release/update-manifest.json \
+            release/update-manifest.sig \
+            release/SHA256SUMS.txt
+
+      - name: Verify published release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view v1.6.7 --repo "$GITHUB_REPOSITORY" --json tagName,name,isDraft,isPrerelease,assets > release.json
+          python - <<'PY'
+          import json
+          data=json.load(open('release.json',encoding='utf-8'))
+          assert data['tagName']=='v1.6.7'
+          assert data['name']=='SIP-Fehleranalyse v1.6.7'
+          assert not data['isDraft']
+          assert not data['isPrerelease']
+          names={a['name'] for a in data['assets']}
+          required={
+            'SIP-Fehleranalyse-v1.6.7-Setup.exe',
+            'SIP-Fehleranalyse-v1.6.7-Portable.zip',
+            'RELEASE-NOTES-v1.6.7.txt',
+            'update-manifest.json',
+            'update-manifest.sig',
+            'SHA256SUMS.txt'
+          }
+          missing=required-names
+          assert not missing, f'Missing release assets: {sorted(missing)}'
+          PY
