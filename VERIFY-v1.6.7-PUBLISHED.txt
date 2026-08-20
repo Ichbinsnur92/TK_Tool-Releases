@@ -1,0 +1,4 @@
+v1.6.7 public release verified successfully.
+Release: https://github.com/Ichbinsnur92/TK_Tool-Releases/releases/tag/v1.6.7
+Installer, portable package, release notes, signed update manifest and SHA256 list: OK
+Verified by GitHub Actions run 32405488062
